@@ -64,10 +64,10 @@ def preprocess_for_contours(image):
     return _preprocess_canny(image)
 
 
-def detect_shapes(image, min_area=150, shape_region_ratio=0.75):
+def detect_shapes(image, min_area=150, shape_region_ratio=0.82):
     """
-    基于轮廓近似识别矩形、三角形、圆形、多边形
-    仅检测图片上方区域（避免下方数字干扰），扩大检测范围至75%
+    基于轮廓近似识别三角形、正方形、矩形、五边形、六边形、圆形、椭圆
+    仅检测图片上方区域（避免下方数字干扰），默认检测范围至82%
     :param image: BGR彩色图像
     :param min_area: 最小有效轮廓面积
     :param shape_region_ratio: 形状区域占图片高度的比例（上方部分）
@@ -110,6 +110,15 @@ def detect_shapes(image, min_area=150, shape_region_ratio=0.75):
         hull_peri = cv2.arcLength(hull, True)
         hull_low = len(cv2.approxPolyDP(hull, 0.001 * hull_peri, True))
 
+        # 拟合椭圆的长短轴之比：对倾斜椭圆比圆度/长宽比更鲁棒
+        fit_axes_ratio = 1.0
+        if len(cnt) >= 5:
+            try:
+                (_, _), (minor, major), _ = cv2.fitEllipse(cnt)
+                fit_axes_ratio = major / minor if minor > 0 else 1.0
+            except cv2.error:
+                fit_axes_ratio = 1.0
+
         shape_name = "unknown"
         if vertices == 3:
             shape_name = "ellipse" if hull_low >= 15 else "triangle"
@@ -127,7 +136,9 @@ def detect_shapes(image, min_area=150, shape_region_ratio=0.75):
         elif vertices == 6:
             shape_name = "ellipse" if hull_low >= 15 else "hexagon"
         elif vertices >= 7:
-            if circularity > 0.78 and aspect_ratio < 1.3:
+            if fit_axes_ratio > 1.2:
+                shape_name = "ellipse"
+            elif circularity > 0.78 and aspect_ratio < 1.3:
                 shape_name = "circle"
             elif aspect_ratio > 1.25 or hull_low >= 15:
                 shape_name = "ellipse"
@@ -213,4 +224,4 @@ if __name__ == "__main__":
     input_image = os.path.join(project_root, "test_images", "original", "images", "shape_number_test.jpg")
     output_dir = os.path.join(project_root, "test_images", "results", "task3")
     # shape_number_test 下方有数字，限制检测区域避免误识别
-    shape_recognition_pipeline(input_image, output_dir, shape_region_ratio=0.78)
+    shape_recognition_pipeline(input_image, output_dir, shape_region_ratio=0.82)

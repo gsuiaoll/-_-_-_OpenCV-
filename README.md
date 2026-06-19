@@ -309,7 +309,7 @@ python -m src.task4_advanced.trackbar_tool
 - **输出**：*_shapes.jpg
 - **识别算法**：自适应预处理（白色背景用HSV阈值，其他用BGR三通道Canny） + 多边形近似(approxPolyDP, ε=0.015×周长) + 圆度判断 + 凸包低精度近似辅助
 - **形状类型**：triangle, square, rectangle, pentagon, hexagon, circle, ellipse
-- **检测区域**：`shape_number_test.jpg` 限制为图片上方78%区域（避免下方数字干扰），其他图片默认使用全图
+- **检测区域**：`shape_number_test.jpg` 限制为图片上方82%区域（避免下方数字干扰），其他图片默认使用全图
 
 #### 任务三：数字识别
 - **输入**：shape_number_test.jpg

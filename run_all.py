@@ -49,7 +49,7 @@ def main():
     shape_recognition_pipeline(
         os.path.join(base_image_dir, "shape_number_test.jpg"),
         os.path.join(results_dir, "task3"),
-        shape_region_ratio=0.78
+        shape_region_ratio=0.82
     )
 
     # 任务三：数字识别
