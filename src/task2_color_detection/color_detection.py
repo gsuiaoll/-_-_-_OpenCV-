@@ -108,7 +108,7 @@ def detect_color_targets(image, color_name, min_area=200):
         cv2.rectangle(result_image, (x, y), (x + w, y + h), (0, 255, 0), 2)
         cv2.circle(result_image, (center_x, center_y), 5, (0, 255, 255), -1)
 
-        # 标注信息（自适应位置，避免超出边界或互相遮挡）
+        # 标注信息（增加深色背景条，确保文字在任何背景色上都清晰可读）
         h_img, w_img = result_image.shape[:2]
         label = f"{color_name.upper()}#{i+1} A:{int(area)} C:({center_x},{center_y})"
         font = cv2.FONT_HERSHEY_SIMPLEX
@@ -123,6 +123,12 @@ def detect_color_targets(image, color_name, min_area=200):
         # 避免超出右边界
         if label_x + tw > w_img:
             label_x = max(2, w_img - tw - 2)
+        # 绘制深色背景条（确保文字在任何背景色上都清晰）
+        bg_x1 = max(0, label_x - 3)
+        bg_y1 = max(0, label_y - th - 5)
+        bg_x2 = min(w_img, label_x + tw + 3)
+        bg_y2 = min(h_img, label_y + 5)
+        cv2.rectangle(result_image, (bg_x1, bg_y1), (bg_x2, bg_y2), (30, 30, 30), -1)
         cv2.putText(result_image, label, (label_x, label_y),
                     font, 0.45, color_bgr, 2)
 

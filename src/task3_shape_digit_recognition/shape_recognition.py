@@ -30,10 +30,10 @@ def preprocess_for_contours(image):
     return edges
 
 
-def detect_shapes(image, min_area=300, shape_region_ratio=0.6):
+def detect_shapes(image, min_area=300, shape_region_ratio=0.75):
     """
     基于轮廓近似识别矩形、三角形、圆形、多边形
-    仅检测图片上方区域（避免下方数字干扰）
+    仅检测图片上方区域（避免下方数字干扰），扩大检测范围至75%
     :param image: BGR彩色图像
     :param min_area: 最小有效轮廓面积
     :param shape_region_ratio: 形状区域占图片高度的比例（上方部分）
@@ -109,13 +109,20 @@ def detect_shapes(image, min_area=300, shape_region_ratio=0.6):
         cv2.drawContours(result, [approx], -1, color, 2)
         cv2.circle(result, (center_x, center_y), 5, (0, 0, 255), -1)
 
-        # 标签放在图形上方，避免重叠
+        # 标签放在图形上方，增加深色背景条确保文字在任何背景色上都清晰
         label = f"{shape_name}"
-        label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)[0]
+        label_font = cv2.FONT_HERSHEY_SIMPLEX
+        label_size = cv2.getTextSize(label, label_font, 0.5, 2)[0]
         label_x = max(5, center_x - label_size[0] // 2)
         label_y = max(20, y - 5)
+        # 绘制深色背景条
+        bg_x1 = max(0, label_x - 3)
+        bg_y1 = max(0, label_y - label_size[1] - 5)
+        bg_x2 = min(result.shape[1], label_x + label_size[0] + 3)
+        bg_y2 = min(result.shape[0], label_y + 5)
+        cv2.rectangle(result, (bg_x1, bg_y1), (bg_x2, bg_y2), (30, 30, 30), -1)
         cv2.putText(result, label, (label_x, label_y),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+                    label_font, 0.5, color, 2)
 
     return result, shapes
 
