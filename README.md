@@ -1,7 +1,8 @@
 # 视觉算法组最终考核 — OpenCV图像识别项目
 
 > **仓库命名**：`LiWenfeng_Vision_Final_OpenCV`（对应 `李文锋_视觉组_最终考核_OpenCV识别`）  
-> **考核达标**：完成后将个人GitHub仓库链接发送到 `numiyo@163.com`
+> **考核达标**：完成后将个人GitHub仓库链接发送到 `numiyo@163.com`  
+> **在线仓库**：https://github.com/gsuiaoll/LiWenfeng_Vision_Final_OpenCV
 
 ---
 
@@ -63,7 +64,14 @@ python -c "import cv2; print(cv2.__version__)"
 │       ├── robustness_test.py              # 进阶二：鲁棒性测试
 │       └── trackbar_tool.py                # 进阶三：Trackbar交互调参
 └── test_images/
-    ├── original/                           # 原始测试图片
+    ├── original/
+    │   └── images/                         # 原始测试图片
+    │       ├── basic_test.jpg
+    │       ├── color_test.jpg
+    │       ├── shape_number_test.jpg
+    │       ├── armor_test.jpg
+    │       ├── lighting/                   # 光照鲁棒性测试图
+    │       └── occlusion/                  # 遮挡鲁棒性测试图
     └── results/                            # 测试结果图（按任务分类）
         ├── task1/
         ├── task2/
@@ -119,18 +127,22 @@ python -c "import cv2; print(cv2.__version__)"
 
 #### 3.1 几何图形识别
 
-**目标**：识别图片中的矩形、圆形、三角形等基础几何图形。
+**目标**：识别图片中的三角形、正方形、矩形、五边形、六边形、圆形、椭圆等几何图形。
 
 **实现要点**：
 
-1. **边缘检测**：Canny + 膨胀连接断裂边缘
-2. **多边形近似**：`cv2.approxPolyDP()`，根据顶点数初步分类
-3. **形状判断**：
-   - 3个顶点 → 三角形
-   - 4个顶点 + 长宽比接近1 → 正方形，否则矩形
+1. **自适应预处理**：
+   - 白色背景图片（如 `shape_number_test.jpg`）：基于 HSV 饱和度/亮度阈值分离彩色/深色形状
+   - 非白色背景图片：基于 BGR 三通道 Canny 边缘检测 + 膨胀/闭运算填充形状内部
+2. **多边形近似**：`cv2.approxPolyDP()`，ε=0.015×周长，根据顶点数初步分类
+3. **圆度计算**：`4 * π * 面积 / 周长²`，用于区分圆形与多边形
+4. **凸包辅助判断**：对凸包进行低精度近似（ε=0.001×凸包周长），利用平滑图形（圆/椭圆）顶点数远多于多边形的特点，修正低分辨率或小尺寸形状的误识别
+5. **形状判断**：
+   - 3个顶点 → 三角形（凸包顶点少）或椭圆（凸包顶点多）
+   - 4个顶点 → 正方形、矩形、椭圆或五边形（结合长宽比与凸包顶点数）
    - 5个顶点 → 五边形
-   - ≥6个顶点 + 圆度 > 0.7 → 圆形，否则多边形
-4. **圆度计算**：`4 * π * 面积 / 周长²`
+   - 6个顶点 → 六边形或椭圆
+   - ≥7个顶点 → 圆形、椭圆或六边形（结合圆度、长宽比）
 
 **关键代码位置**：`src/task3_shape_digit_recognition/shape_recognition.py`
 
@@ -217,13 +229,15 @@ python -m src.task4_advanced.trackbar_tool
 
 ## 五、快速运行
 
-### 5.1 一键运行所有任务
+### 5.1 一键运行所有非交互式任务
 
 ```bash
 python run_all.py
 ```
 
-运行后所有测试结果将保存在 `test_images/results/` 目录下。
+运行后所有非交互式任务的测试结果将保存在 `test_images/results/` 目录下。
+
+> 注：`run_all.py` 包含任务一至任务四的自动化测试；Trackbar 交互调参工具因需要人工操作，需单独运行。
 
 ### 5.2 单独运行某个任务
 
@@ -267,7 +281,7 @@ python -m src.task4_advanced.trackbar_tool
 | 多条件目标精定位（装甲板） | task4_advanced | `detect_light_bars()`, `find_armor_candidates()`, `detect_corners()` | ✅ 检测到4个装甲板目标（颜色+轮廓+角点融合） |
 | 算法鲁棒性测试 | task4_advanced | `robustness_test_pipeline()`, 光照/遮挡场景测试 | ✅ 自动生成Markdown测试报告 |
 | 交互调参工具（Trackbar） | task4_advanced | 基于 `cv2.createTrackbar()` 实时调节 | ✅ 可交互实时调参 |
-| 代码模块化拆分 | src/ 下7个.py文件 + utils.py | 各模块独立，单任务可单独运行 | ✅ 结构清晰 |
+| 代码模块化拆分 | src/ 下8个任务/工具脚本 + utils.py | 各模块独立，单任务可单独运行 | ✅ 结构清晰 |
 | 关键函数中文注释 | 所有函数 | docstring + 行内逻辑注释 | ✅ 注释完整 |
 | 测试效果图分类存放 | test_images/results/ | task1/task2/task3/task4 分类存放 | ✅ 按任务分类 |
 | 处理前后对比图 | 各任务对比图 | `create_comparison_image()` 生成 | ✅ 各任务均有对比图 |
@@ -291,11 +305,11 @@ python -m src.task4_advanced.trackbar_tool
 - **最小面积过滤**：200像素
 
 #### 任务三：几何图形识别
-- **输入**：shape_number_test.jpg
-- **输出**：shape_number_test_shapes.jpg
-- **识别算法**：Canny边缘检测 + 多边形近似(approxPolyDP, ε=0.04×周长) + 圆度判断
-- **形状类型**：triangle(3顶点), square/rectangle(4顶点), pentagon(5顶点), hexagon(6顶点), circle(≥7顶点, 圆度>0.7), polygon(其他)
-- **检测区域**：图片上方75%区域（避免下方数字干扰）
+- **输入**：shape_number_test.jpg / basic_test.jpg / color_test.jpg
+- **输出**：*_shapes.jpg
+- **识别算法**：自适应预处理（白色背景用HSV阈值，其他用BGR三通道Canny） + 多边形近似(approxPolyDP, ε=0.015×周长) + 圆度判断 + 凸包低精度近似辅助
+- **形状类型**：triangle, square, rectangle, pentagon, hexagon, circle, ellipse
+- **检测区域**：`shape_number_test.jpg` 限制为图片上方78%区域（避免下方数字干扰），其他图片默认使用全图
 
 #### 任务三：数字识别
 - **输入**：shape_number_test.jpg
@@ -372,7 +386,7 @@ git commit -m "提交说明"
 # 关联远程仓库
 git remote add origin https://github.com/gsuiaoll/LiWenfeng_Vision_Final_OpenCV.git
 
-# 推送到远程仓库
+# 推送到远程仓库（请根据实际默认分支替换 master/main）
 git push -u origin master
 ```
 
@@ -382,6 +396,6 @@ git push -u origin master
 
 - 姓名：李文锋
 - 学校/团队：视觉算法组
-- 联系方式：19257633854
 
-> 完成时间：2026年6月
+> 完成时间：2026年6月  
+> 注：本项目在考核要求基础上持续优化，最终完成时间为2026年6月。

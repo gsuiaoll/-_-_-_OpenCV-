@@ -48,7 +48,8 @@ def main():
     print("\n[任务三] 几何图形识别...")
     shape_recognition_pipeline(
         os.path.join(base_image_dir, "shape_number_test.jpg"),
-        os.path.join(results_dir, "task3")
+        os.path.join(results_dir, "task3"),
+        shape_region_ratio=0.78
     )
 
     # 任务三：数字识别

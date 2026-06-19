@@ -141,6 +141,10 @@ class TrackbarTool:
             if key == ord('s'):
                 self.save_current_state(params, combined, mask)
 
+            # 检测窗口是否被鼠标关闭，避免程序在后台空转
+            if cv2.getWindowProperty(self.WINDOW_NAME, cv2.WND_PROP_VISIBLE) < 1:
+                break
+
         cv2.destroyAllWindows()
         print("调参工具已关闭")
 
@@ -171,5 +175,7 @@ def trackbar_tool_pipeline(image_path):
 
 
 if __name__ == "__main__":
-    input_image = os.path.join("test_images", "original", "images", "color_test.jpg")
+    # 基于当前文件位置计算项目根目录，支持从任意目录运行
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    input_image = os.path.join(project_root, "test_images", "original", "images", "color_test.jpg")
     trackbar_tool_pipeline(input_image)

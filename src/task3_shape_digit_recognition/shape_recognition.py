@@ -15,19 +15,53 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 from src.utils import read_image, save_image, create_comparison_image
 
 
+def _is_white_background(hsv):
+    """判断是否为纯白/近白背景（如 shape_number_test.jpg）"""
+    white_mask = ((hsv[:, :, 1] < 40) & (hsv[:, :, 2] > 200)).astype(np.uint8) * 255
+    total = hsv.shape[0] * hsv.shape[1]
+    return cv2.countNonZero(white_mask) / total > 0.6
+
+
+def _preprocess_hsv(image):
+    """基于 HSV 饱和度/亮度阈值分离彩色/深色形状与白色背景"""
+    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    # 彩色形状饱和度较高；深色形状亮度较低
+    mask = ((hsv[:, :, 1] > 20) | (hsv[:, :, 2] < 200)).astype(np.uint8) * 255
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=2)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=1)
+    return mask
+
+
+def _preprocess_canny(image):
+    """基于多通道 Canny 边缘检测，适用于非白色背景"""
+    edges = np.zeros((image.shape[0], image.shape[1]), dtype=np.uint8)
+    for i in range(3):
+        blurred = cv2.GaussianBlur(image[:, :, i], (5, 5), 0)
+        edges = cv2.bitwise_or(edges, cv2.Canny(blurred, 30, 120))
+
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+    edges = cv2.dilate(edges, kernel, iterations=2)
+    edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel, iterations=2)
+
+    contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    filled = np.zeros_like(edges)
+    cv2.drawContours(filled, contours, -1, 255, -1)
+    filled = cv2.erode(filled, np.ones((3, 3), np.uint8), iterations=1)
+    return filled
+
+
 def preprocess_for_contours(image):
     """
-    对图像进行预处理，便于后续轮廓检测
+    对图像进行预处理，分离前景形状与背景。
+    若背景为白色，使用 HSV 饱和度阈值；否则使用多通道 Canny 边缘检测并填充。
     :param image: BGR彩色图像
-    :return: 边缘检测后的二值图
+    :return: 二值化后的实心形状图
     """
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-    edges = cv2.Canny(blurred, 30, 120)
-    # 膨胀连接断裂边缘
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-    edges = cv2.dilate(edges, kernel, iterations=1)
-    return edges
+    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    if _is_white_background(hsv):
+        return _preprocess_hsv(image)
+    return _preprocess_canny(image)
 
 
 def detect_shapes(image, min_area=150, shape_region_ratio=0.75):
@@ -57,34 +91,48 @@ def detect_shapes(image, min_area=150, shape_region_ratio=0.75):
         if area < min_area:
             continue
 
-        # 计算轮廓周长
+        # 计算轮廓周长，使用原始轮廓保留凹顶点（如五边形的侧边）
         peri = cv2.arcLength(cnt, True)
-        # 多边形近似
-        approx = cv2.approxPolyDP(cnt, 0.04 * peri, True)
+        approx = cv2.approxPolyDP(cnt, 0.015 * peri, True)
         vertices = len(approx)
 
-        # 计算外接矩形、长宽比
-        x, y, bw, bh = cv2.boundingRect(approx)
-        aspect_ratio = float(bw) / bh if bh > 0 else 0
+        # 计算外接矩形、中心点
+        x, y, bw, bh = cv2.boundingRect(cnt)
         center_x, center_y = x + bw // 2, y + bh // 2
+        # 计算长宽比（使用外接矩形，长边/短边，始终>=1）
+        aspect_ratio = max(bw, bh) / min(bw, bh) if min(bw, bh) > 0 else 1.0
 
         # 圆度判断：面积与周长关系
         circularity = 4 * np.pi * area / (peri * peri) if peri > 0 else 0
 
+        # 凸包低精度近似顶点数：平滑的椭圆/圆会留下很多顶点，多边形则被压缩
+        hull = cv2.convexHull(cnt)
+        hull_peri = cv2.arcLength(hull, True)
+        hull_low = len(cv2.approxPolyDP(hull, 0.001 * hull_peri, True))
+
         shape_name = "unknown"
         if vertices == 3:
-            shape_name = "triangle"
+            shape_name = "ellipse" if hull_low >= 15 else "triangle"
         elif vertices == 4:
-            shape_name = "square" if 0.9 <= aspect_ratio <= 1.1 else "rectangle"
+            if hull_low >= 15:
+                shape_name = "ellipse"
+            elif 0.8 <= aspect_ratio <= 1.25:
+                shape_name = "square"
+            elif hull_low >= 6 and aspect_ratio > 1.3:
+                shape_name = "pentagon"
+            else:
+                shape_name = "rectangle"
         elif vertices == 5:
             shape_name = "pentagon"
         elif vertices == 6:
-            shape_name = "hexagon"
+            shape_name = "ellipse" if hull_low >= 15 else "hexagon"
         elif vertices >= 7:
-            if circularity > 0.7:
+            if circularity > 0.78 and aspect_ratio < 1.3:
                 shape_name = "circle"
+            elif aspect_ratio > 1.25 or hull_low >= 15:
+                shape_name = "ellipse"
             else:
-                shape_name = "polygon"
+                shape_name = "hexagon"
 
         shapes.append({
             'id': len(shapes) + 1,
@@ -103,6 +151,7 @@ def detect_shapes(image, min_area=150, shape_region_ratio=0.75):
             'pentagon': (0, 255, 255),
             'hexagon': (255, 0, 255),
             'circle': (0, 255, 0),
+            'ellipse': (128, 0, 128),
             'polygon': (128, 128, 128)
         }
         color = color_map.get(shape_name, (0, 255, 0))
@@ -127,18 +176,19 @@ def detect_shapes(image, min_area=150, shape_region_ratio=0.75):
     return result, shapes
 
 
-def shape_recognition_pipeline(image_path, output_dir, min_area=300):
+def shape_recognition_pipeline(image_path, output_dir, min_area=150, shape_region_ratio=1.0):
     """
     几何图形识别主流程
     :param image_path: 输入图片路径
     :param output_dir: 结果输出目录
     :param min_area: 最小有效面积
+    :param shape_region_ratio: 形状检测区域占图片高度的比例
     """
     original = read_image(image_path)
     if original is None:
         return
 
-    result, shapes = detect_shapes(original, min_area)
+    result, shapes = detect_shapes(original, min_area, shape_region_ratio)
     base_name = os.path.splitext(os.path.basename(image_path))[0]
 
     save_image(os.path.join(output_dir, f"{base_name}_edges.jpg"), preprocess_for_contours(original))
@@ -158,6 +208,9 @@ def shape_recognition_pipeline(image_path, output_dir, min_area=300):
 
 
 if __name__ == "__main__":
-    input_image = os.path.join("test_images", "original", "images", "shape_number_test.jpg")
-    output_dir = os.path.join("test_images", "results", "task3")
-    shape_recognition_pipeline(input_image, output_dir)
+    # 基于当前文件位置计算项目根目录，支持从任意目录运行
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    input_image = os.path.join(project_root, "test_images", "original", "images", "shape_number_test.jpg")
+    output_dir = os.path.join(project_root, "test_images", "results", "task3")
+    # shape_number_test 下方有数字，限制检测区域避免误识别
+    shape_recognition_pipeline(input_image, output_dir, shape_region_ratio=0.78)

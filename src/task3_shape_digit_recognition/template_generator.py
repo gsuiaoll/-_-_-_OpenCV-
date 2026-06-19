@@ -79,6 +79,8 @@ def extract_digit_templates(image_path, output_dir, digit_region_ratio=0.6):
 
 
 if __name__ == "__main__":
-    input_image = os.path.join("test_images", "original", "images", "shape_number_test.jpg")
-    output_dir = os.path.join("src", "task3_shape_digit_recognition", "templates")
+    # 基于当前文件位置计算项目根目录，支持从任意目录运行
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    input_image = os.path.join(project_root, "test_images", "original", "images", "shape_number_test.jpg")
+    output_dir = os.path.join(project_root, "src", "task3_shape_digit_recognition", "templates")
     extract_digit_templates(input_image, output_dir)

@@ -191,6 +191,8 @@ def color_detection_pipeline(image_path, output_dir, min_area=200):
 
 
 if __name__ == "__main__":
-    input_image = os.path.join("test_images", "original", "images", "color_test.jpg")
-    output_dir = os.path.join("test_images", "results", "task2")
+    # 基于当前文件位置计算项目根目录，支持从任意目录运行
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    input_image = os.path.join(project_root, "test_images", "original", "images", "color_test.jpg")
+    output_dir = os.path.join(project_root, "test_images", "results", "task2")
     color_detection_pipeline(input_image, output_dir)

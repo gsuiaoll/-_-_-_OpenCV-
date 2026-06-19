@@ -68,6 +68,19 @@ def detect_light_bars(image, color_name, min_area=100, max_area=5000):
     return light_bars
 
 
+def normalize_angle(angle):
+    """
+    将minAreaRect角度归一化到[0, 90)区间，消除0°/90°等价歧义
+    OpenCV的minAreaRect返回角度为[-90, 0)，同一矩形旋转90°后角度会突变
+    :param angle: 原始角度
+    :return: 归一化后的角度
+    """
+    angle = abs(angle)
+    while angle >= 90:
+        angle -= 90
+    return angle
+
+
 def find_armor_candidates(light_bars, max_distance_ratio=3.5, max_angle_diff=15):
     """
     根据灯条配对找到候选装甲板，每个灯条最多使用一次
@@ -95,10 +108,15 @@ def find_armor_candidates(light_bars, max_distance_ratio=3.5, max_angle_diff=15)
             length2 = max(w2, h2)
             avg_length = (length1 + length2) / 2
 
+            # 跳过退化灯条，避免除零错误
+            if avg_length <= 0:
+                continue
+
             if distance < avg_length * 0.5 or distance > avg_length * max_distance_ratio:
                 continue
 
-            angle_diff = abs(bar1['angle'] - bar2['angle'])
+            # 角度归一化到[0,90)后再比较差值，避免0°/90°歧义导致误判
+            angle_diff = abs(normalize_angle(bar1['angle']) - normalize_angle(bar2['angle']))
             if angle_diff > max_angle_diff:
                 continue
 
@@ -163,6 +181,10 @@ def detect_corners(image, armor, max_corners=10):
     x2 = min(gray.shape[1], cx + w // 2)
     y2 = min(gray.shape[0], cy + h // 2)
     roi = gray[y1:y2, x1:x2]
+
+    # 校验ROI是否有效，避免空图导致goodFeaturesToTrack报错
+    if roi is None or roi.size == 0 or roi.shape[0] < 2 or roi.shape[1] < 2:
+        return []
 
     corners = cv2.goodFeaturesToTrack(roi, maxCorners=max_corners,
                                        qualityLevel=0.1, minDistance=10)
@@ -264,6 +286,8 @@ def armor_detection_pipeline(image_path, output_dir):
 
 
 if __name__ == "__main__":
-    input_image = os.path.join("test_images", "original", "images", "armor_test.jpg")
-    output_dir = os.path.join("test_images", "results", "task4")
+    # 基于当前文件位置计算项目根目录，支持从任意目录运行
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    input_image = os.path.join(project_root, "test_images", "original", "images", "armor_test.jpg")
+    output_dir = os.path.join(project_root, "test_images", "results", "task4")
     armor_detection_pipeline(input_image, output_dir)

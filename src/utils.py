@@ -32,6 +32,9 @@ def save_image(path, image):
     :param image: 要保存的图像
     :return: 是否保存成功
     """
+    if image is None:
+        print(f"[保存失败] 图像为空: {path}")
+        return False
     directory = os.path.dirname(path)
     if directory and not os.path.exists(directory):
         os.makedirs(directory, exist_ok=True)

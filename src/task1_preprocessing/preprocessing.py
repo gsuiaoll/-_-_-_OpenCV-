@@ -81,6 +81,8 @@ def preprocess_pipeline(image_path, output_dir):
 
 
 if __name__ == "__main__":
-    input_image = os.path.join("test_images", "original", "images", "basic_test.jpg")
-    output_dir = os.path.join("test_images", "results", "task1")
+    # 基于当前文件位置计算项目根目录，支持从任意目录运行
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    input_image = os.path.join(project_root, "test_images", "original", "images", "basic_test.jpg")
+    output_dir = os.path.join(project_root, "test_images", "results", "task1")
     preprocess_pipeline(input_image, output_dir)

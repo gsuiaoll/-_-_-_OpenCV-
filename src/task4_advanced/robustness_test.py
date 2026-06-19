@@ -45,45 +45,6 @@ def apply_lighting_effect(image, lighting_type):
         return image
 
 
-def evaluate_color_detection(image_path, expected_targets=None):
-    """
-    评估颜色检测算法性能
-    :param image_path: 测试图片路径
-    :param expected_targets: 期望检测到的目标数量（Ground Truth）
-    :return: 评估指标字典
-    """
-    image = read_image(image_path)
-    if image is None:
-        return None
-
-    _, red_targets, _, _ = detect_color_targets(image, 'red', min_area=200)
-    _, blue_targets, _, _ = detect_color_targets(image, 'blue', min_area=200)
-
-    detected = len(red_targets) + len(blue_targets)
-    expected = expected_targets if expected_targets is not None else detected
-
-    tp = min(detected, expected)  # 简化：正确检测数
-    fn = max(0, expected - detected)  # 漏检
-    fp = max(0, detected - expected)  # 误检
-
-    precision = tp / (tp + fp) if (tp + fp) > 0 else 0
-    recall = tp / (tp + fn) if (tp + fn) > 0 else 0
-    accuracy = tp / max(detected, expected) if max(detected, expected) > 0 else 0
-
-    return {
-        'image': os.path.basename(image_path),
-        'detected': detected,
-        'expected': expected,
-        'tp': tp,
-        'fn': fn,
-        'fp': fp,
-        'precision': round(precision, 3),
-        'recall': round(recall, 3),
-        'accuracy': round(accuracy, 3),
-        'miss_rate': round(fn / expected, 3) if expected > 0 else 0
-    }
-
-
 def enhance_for_low_light(image):
     """
     对低光照图像进行增强预处理（CLAHE自适应直方图均衡化）
@@ -301,6 +262,8 @@ def robustness_test_pipeline(base_dir, output_dir):
 
 
 if __name__ == "__main__":
-    base_dir = os.path.join("test_images", "original", "images")
-    output_dir = os.path.join("test_images", "results", "task4")
+    # 基于当前文件位置计算项目根目录，支持从任意目录运行
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    base_dir = os.path.join(project_root, "test_images", "original", "images")
+    output_dir = os.path.join(project_root, "test_images", "results", "task4")
     robustness_test_pipeline(base_dir, output_dir)
