@@ -22,27 +22,15 @@ from src.task3_shape_digit_recognition.shape_recognition import detect_shapes
 
 def apply_lighting_effect(image, lighting_type):
     """
-    模拟不同光照效果（如果测试图片已经是不同光照，则直接返回原图）
+    模拟不同光照效果。
+    重要：测试图片已经预先处理了不同光照效果（normal/bright/dark/backlit/gradient），
+    因此这里对已预处理的图片直接返回原图，避免重复施加光照导致颜色信息进一步丢失。
     :param image: BGR图像
     :param lighting_type: 光照类型名称
     :return: 处理后的图像
     """
-    if lighting_type == 'bright':
-        return cv2.convertScaleAbs(image, alpha=1.3, beta=30)
-    elif lighting_type == 'dark':
-        return cv2.convertScaleAbs(image, alpha=0.6, beta=-30)
-    elif lighting_type == 'backlit':
-        # 逆光：边缘增强，中心区域较暗
-        result = cv2.convertScaleAbs(image, alpha=0.8, beta=-20)
-        return result
-    elif lighting_type == 'gradient':
-        # 渐变光照：创建从左到右的渐变遮罩
-        h, w = image.shape[:2]
-        gradient = np.linspace(0.4, 1.2, w).reshape(1, w, 1).astype(np.float32)
-        result = (image.astype(np.float32) * gradient).clip(0, 255).astype(np.uint8)
-        return result
-    else:
-        return image
+    # 测试图片已包含光照效果，直接返回原图，避免双重处理
+    return image
 
 
 def enhance_for_low_light(image):

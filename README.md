@@ -278,7 +278,7 @@ python -m src.task4_advanced.trackbar_tool
 | 颜色阈值色块识别 | task2_color_detection | `hsv_color_threshold()`, `morphological_process()`, `detect_color_targets()` | ✅ 红蓝目标成功分割并标注坐标面积 |
 | 简单特征识别（几何图形） | task3_shape_digit_recognition | `detect_shapes()`, `preprocess_for_contours()` | ✅ 识别三角形/矩形/正方形/五边形/六边形/圆形 |
 | 0-9数字识别（禁OCR库） | task3_shape_digit_recognition | `digit_recognition_pipeline()`, 模板匹配 + Hu矩轮廓匹配 | ✅ 识别序列：0123456789，准确率100%（排除彩色形状内部镂空干扰） |
-| 多条件目标精定位（装甲板） | task4_advanced | `detect_light_bars()`, `find_armor_candidates()`, `detect_corners()` | ✅ 检测到4个装甲板目标（颜色+轮廓+角点融合） |
+| 多条件目标精定位（装甲板） | task4_advanced | `detect_light_bars()`, `find_armor_candidates()`, `detect_corners()` | ✅ 检测到5个装甲板目标（颜色+轮廓+角点融合） |
 | 算法鲁棒性测试 | task4_advanced | `robustness_test_pipeline()`, 光照/遮挡场景测试 | ✅ 自动生成Markdown测试报告 |
 | 交互调参工具（Trackbar） | task4_advanced | 基于 `cv2.createTrackbar()` 实时调节 | ✅ 可交互实时调参 |
 | 代码模块化拆分 | src/ 下8个任务/工具脚本 + utils.py | 各模块独立，单任务可单独运行 | ✅ 结构清晰 |
@@ -322,7 +322,7 @@ python -m src.task4_advanced.trackbar_tool
 - **输入**：armor_test.jpg
 - **输出**：armor_test_armor_result.jpg, armor_test_armor_comparison.jpg
 - **算法流程**：HSV颜色阈值 → 灯条检测（长宽比≥1.5）→ 贪心配对 → 角点检测辅助
-- **检测结果**：4个装甲板目标，输出中心坐标+旋转角度
+- **检测结果**：5个装甲板目标，输出中心坐标+旋转角度
 
 #### 进阶任务二：鲁棒性测试
 - **输入**：lighting/ 目录（5种光照场景），occlusion/ 目录（4种遮挡场景）
