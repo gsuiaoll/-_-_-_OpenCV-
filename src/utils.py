@@ -86,8 +86,18 @@ def create_comparison_image(images, titles, cols=2):
         canvas[row * target_h + y_offset: row * target_h + y_offset + new_h,
                col * target_w + x_offset: col * target_w + x_offset + new_w] = resized
 
-        # 添加标题
-        cv2.putText(canvas, title, (col * target_w + 10, row * target_h + 30),
-                    font, 0.7, (0, 255, 255), 2)
+        # 绘制标题背景条（深灰色半透明），保证任何背景上标题都清晰
+        text_size, _ = cv2.getTextSize(title, font, 0.7, 2)
+        tw, th = text_size
+        bar_h = th + 16
+        bar_x1 = col * target_w
+        bar_y1 = row * target_h
+        bar_x2 = bar_x1 + tw + 20
+        bar_y2 = bar_y1 + bar_h
+        cv2.rectangle(canvas, (bar_x1, bar_y1), (bar_x2, bar_y2), (40, 40, 40), -1)
+        # 添加标题（黄色字体+黑色描边）
+        title_pos = (bar_x1 + 10, bar_y1 + th + 5)
+        cv2.putText(canvas, title, title_pos, font, 0.7, (0, 0, 0), 4)  # 黑色描边
+        cv2.putText(canvas, title, title_pos, font, 0.7, (0, 255, 255), 2)  # 黄色字体
 
     return canvas

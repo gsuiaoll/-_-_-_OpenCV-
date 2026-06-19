@@ -60,17 +60,20 @@ def preprocess_pipeline(image_path, output_dir):
 
     gray = grayscale(original)
     blurred = gaussian_blur(gray, (5, 5), 1.0)
-    equalized = histogram_equalization(gray)
+    # 彩色图均衡化，保留更多视觉信息
+    equalized_color = histogram_equalization(original)
+    # 同时保留灰度均衡化
+    equalized_gray = histogram_equalization(gray)
 
     # 单独保存各个处理结果
     base_name = os.path.splitext(os.path.basename(image_path))[0]
     save_image(os.path.join(output_dir, f"{base_name}_gray.jpg"), gray)
     save_image(os.path.join(output_dir, f"{base_name}_blur.jpg"), blurred)
-    save_image(os.path.join(output_dir, f"{base_name}_equalize.jpg"), equalized)
+    save_image(os.path.join(output_dir, f"{base_name}_equalize.jpg"), equalized_gray)
 
-    # 生成对比图：原图、灰度、模糊、均衡化
+    # 生成对比图：原图、灰度、模糊、均衡化（彩色）
     comparison = create_comparison_image(
-        [original, gray, blurred, equalized],
+        [original, gray, blurred, equalized_color],
         ["Original", "Grayscale", "Gaussian Blur", "Histogram Equalization"],
         cols=2
     )
