@@ -30,20 +30,29 @@ def preprocess_for_contours(image):
     return edges
 
 
-def detect_shapes(image, min_area=300):
+def detect_shapes(image, min_area=300, shape_region_ratio=0.6):
     """
     基于轮廓近似识别矩形、三角形、圆形、多边形
+    仅检测图片上方区域（避免下方数字干扰）
     :param image: BGR彩色图像
     :param min_area: 最小有效轮廓面积
+    :param shape_region_ratio: 形状区域占图片高度的比例（上方部分）
     :return: 标注后的图像和图形信息列表
     """
-    edges = preprocess_for_contours(image)
+    h, w = image.shape[:2]
+    # 仅在图片上方区域检测形状（避免下方数字干扰）
+    shape_region = image[:int(h * shape_region_ratio), :]
+
+    edges = preprocess_for_contours(shape_region)
     contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     result = image.copy()
     shapes = []
 
-    for i, cnt in enumerate(contours):
+    # 按面积从大到小排序，先处理大轮廓
+    sorted_contours = sorted(contours, key=cv2.contourArea, reverse=True)
+
+    for i, cnt in enumerate(sorted_contours):
         area = cv2.contourArea(cnt)
         if area < min_area:
             continue
@@ -54,10 +63,10 @@ def detect_shapes(image, min_area=300):
         approx = cv2.approxPolyDP(cnt, 0.04 * peri, True)
         vertices = len(approx)
 
-        # 计算外接矩形、长宽比和最小外接圆
-        x, y, w, h = cv2.boundingRect(approx)
-        aspect_ratio = float(w) / h if h > 0 else 0
-        center_x, center_y = x + w // 2, y + h // 2
+        # 计算外接矩形、长宽比
+        x, y, bw, bh = cv2.boundingRect(approx)
+        aspect_ratio = float(bw) / bh if bh > 0 else 0
+        center_x, center_y = x + bw // 2, y + bh // 2
 
         # 圆度判断：面积与周长关系
         circularity = 4 * np.pi * area / (peri * peri) if peri > 0 else 0
@@ -66,19 +75,19 @@ def detect_shapes(image, min_area=300):
         if vertices == 3:
             shape_name = "triangle"
         elif vertices == 4:
-            # 根据长宽比判断矩形还是正方形
             shape_name = "square" if 0.9 <= aspect_ratio <= 1.1 else "rectangle"
         elif vertices == 5:
             shape_name = "pentagon"
-        elif vertices >= 6:
-            # 边数>=6时，结合圆度判断是否为圆
+        elif vertices == 6:
+            shape_name = "hexagon"
+        elif vertices >= 7:
             if circularity > 0.7:
                 shape_name = "circle"
             else:
                 shape_name = "polygon"
 
         shapes.append({
-            'id': i + 1,
+            'id': len(shapes) + 1,
             'shape': shape_name,
             'vertices': vertices,
             'area': int(area),
@@ -86,13 +95,27 @@ def detect_shapes(image, min_area=300):
             'circularity': round(circularity, 3)
         })
 
-        # 绘制识别结果
-        color = (0, 255, 0)
+        # 绘制识别结果（使用不同颜色区分形状类型）
+        color_map = {
+            'triangle': (0, 255, 0),
+            'square': (255, 255, 0),
+            'rectangle': (255, 165, 0),
+            'pentagon': (0, 255, 255),
+            'hexagon': (255, 0, 255),
+            'circle': (0, 255, 0),
+            'polygon': (128, 128, 128)
+        }
+        color = color_map.get(shape_name, (0, 255, 0))
         cv2.drawContours(result, [approx], -1, color, 2)
         cv2.circle(result, (center_x, center_y), 5, (0, 0, 255), -1)
-        label = f"{shape_name}#{i+1}"
-        cv2.putText(result, label, (x, y - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+
+        # 标签放在图形上方，避免重叠
+        label = f"{shape_name}"
+        label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)[0]
+        label_x = max(5, center_x - label_size[0] // 2)
+        label_y = max(20, y - 5)
+        cv2.putText(result, label, (label_x, label_y),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
 
     return result, shapes
 

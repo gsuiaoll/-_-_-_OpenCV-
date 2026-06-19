@@ -210,8 +210,9 @@ def detect_digits(image, min_area=80, max_area=2000, digit_region_ratio=0.6):
 
         # 绘制识别结果（使用原图坐标）
         cv2.rectangle(result, (x, original_y), (x+bw, original_y+bh), (0, 255, 0), 2)
-        cv2.putText(result, f"{digit}", (x, original_y - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
+        # 标签放在数字框内部底部，避免与上方形状重叠
+        cv2.putText(result, f"{digit}", (x + 2, original_y + bh - 5),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
 
     # 按x坐标排序，模拟从左到右的阅读顺序
     detections.sort(key=lambda d: d['bbox'][0])

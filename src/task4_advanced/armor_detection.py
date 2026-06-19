@@ -205,10 +205,26 @@ def detect_armor(image, min_area=100, max_area=5000):
             for corner in corners:
                 cv2.circle(result, tuple(corner), 3, (0, 255, 0), -1)
 
-            # 标注信息
-            label = f"ARMOR {color_name.upper()} C:({cx},{cy}) A:{armor['angle']}°"
-            cv2.putText(result, label, (cx - 80, cy - 20),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, color_bgr, 2)
+            # 标注信息（自适应位置，避免截断）
+            h_img, w_img = result.shape[:2]
+            label1 = f"ARMOR {color_name.upper()}"
+            label2 = f"C:({cx},{cy}) A:{round(armor['angle'], 1)}°"
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            tw1 = cv2.getTextSize(label1, font, 0.45, 2)[0][0]
+            tw2 = cv2.getTextSize(label2, font, 0.4, 2)[0][0]
+            max_tw = max(tw1, tw2)
+            # 标签放在装甲板框下方，避免超出图片边界
+            lx = max(5, min(cx - max_tw // 2, w_img - max_tw - 5))
+            # 放在框下方，如果下方空间不够则放上方
+            box_bottom = cy + armor['height'] // 2 + 5
+            box_top = cy - armor['height'] // 2 - 5
+            if box_bottom + 40 < h_img:
+                ly1 = box_bottom + 15
+            else:
+                ly1 = max(20, box_top - 35)
+            ly2 = ly1 + 18
+            cv2.putText(result, label1, (lx, ly1), font, 0.45, color_bgr, 2)
+            cv2.putText(result, label2, (lx, ly2), font, 0.4, color_bgr, 2)
 
     return result, all_armors
 
