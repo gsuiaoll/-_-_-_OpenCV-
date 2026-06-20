@@ -10,13 +10,24 @@ import sys
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+
+def _get_screen_size():
+    """获取屏幕分辨率，Windows下使用ctypes，失败则返回常见默认值"""
+    try:
+        import ctypes
+        user32 = ctypes.windll.user32
+        return user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
+    except Exception:
+        return 1920, 1080
 from src.utils import read_image, save_image
 
 
 class TrackbarTool:
     """Trackbar可视化调参工具类"""
 
-    WINDOW_NAME = "HSV Parameter Tuning Tool"
+    CONTROL_WINDOW = "HSV Controls"
+    DISPLAY_WINDOW = "HSV Result"
 
     def __init__(self, image_path):
         self.image = read_image(image_path)
@@ -24,44 +35,79 @@ class TrackbarTool:
             raise FileNotFoundError(f"无法加载图片: {image_path}")
 
         self.hsv = cv2.cvtColor(self.image, cv2.COLOR_BGR2HSV)
-        cv2.namedWindow(self.WINDOW_NAME, cv2.WINDOW_AUTOSIZE)
 
-        # 创建Trackbar
-        cv2.createTrackbar("H Lower", self.WINDOW_NAME, 0, 180, self.nothing)
-        cv2.createTrackbar("H Upper", self.WINDOW_NAME, 180, 180, self.nothing)
-        cv2.createTrackbar("H Lower2", self.WINDOW_NAME, 0, 180, self.nothing)
-        cv2.createTrackbar("H Upper2", self.WINDOW_NAME, 0, 180, self.nothing)
-        cv2.createTrackbar("S Lower", self.WINDOW_NAME, 0, 255, self.nothing)
-        cv2.createTrackbar("S Upper", self.WINDOW_NAME, 255, 255, self.nothing)
-        cv2.createTrackbar("V Lower", self.WINDOW_NAME, 0, 255, self.nothing)
-        cv2.createTrackbar("V Upper", self.WINDOW_NAME, 255, 255, self.nothing)
-        cv2.createTrackbar("Blur Kernel", self.WINDOW_NAME, 1, 21, self.nothing)
-        cv2.createTrackbar("Morph Kernel", self.WINDOW_NAME, 1, 21, self.nothing)
-        cv2.createTrackbar("Min Area", self.WINDOW_NAME, 100, 2000, self.nothing)
+        # 获取屏幕分辨率，动态计算两个窗口的尺寸和位置
+        screen_w, screen_h = _get_screen_size()
+        # 控制窗口宽度固定约500px，显示窗口尽量占满剩余横向空间
+        self.control_w = 500
+        self.display_max_w = max(800, screen_w - self.control_w - 80)
+        self.display_max_h = max(500, screen_h - 120)
+
+        # 创建两个窗口：控制窗口专门放滑块，显示窗口专门放图片
+        # 这是OpenCV下调参工具的标准做法，可避免单窗口内滑块和图片互相挤压
+        cv2.namedWindow(self.CONTROL_WINDOW, cv2.WINDOW_NORMAL)
+        cv2.namedWindow(self.DISPLAY_WINDOW, cv2.WINDOW_NORMAL)
+        cv2.moveWindow(self.CONTROL_WINDOW, 20, 20)
+        cv2.moveWindow(self.DISPLAY_WINDOW, self.control_w + 40, 20)
+
+        # 在控制窗口创建Trackbar
+        cv2.createTrackbar("H Lower", self.CONTROL_WINDOW, 0, 180, self.nothing)
+        cv2.createTrackbar("H Upper", self.CONTROL_WINDOW, 180, 180, self.nothing)
+        cv2.createTrackbar("H Lower2", self.CONTROL_WINDOW, 0, 180, self.nothing)
+        cv2.createTrackbar("H Upper2", self.CONTROL_WINDOW, 0, 180, self.nothing)
+        cv2.createTrackbar("S Lower", self.CONTROL_WINDOW, 0, 255, self.nothing)
+        cv2.createTrackbar("S Upper", self.CONTROL_WINDOW, 255, 255, self.nothing)
+        cv2.createTrackbar("V Lower", self.CONTROL_WINDOW, 0, 255, self.nothing)
+        cv2.createTrackbar("V Upper", self.CONTROL_WINDOW, 255, 255, self.nothing)
+        cv2.createTrackbar("BlurK", self.CONTROL_WINDOW, 1, 21, self.nothing)
+        cv2.createTrackbar("MorphK", self.CONTROL_WINDOW, 1, 21, self.nothing)
+        cv2.createTrackbar("MinArea", self.CONTROL_WINDOW, 100, 2000, self.nothing)
 
         # 设置初始值（蓝色示例，H2 范围默认关闭）
-        cv2.setTrackbarPos("H Lower", self.WINDOW_NAME, 100)
-        cv2.setTrackbarPos("H Upper", self.WINDOW_NAME, 130)
-        cv2.setTrackbarPos("S Lower", self.WINDOW_NAME, 120)
-        cv2.setTrackbarPos("V Lower", self.WINDOW_NAME, 100)
+        cv2.setTrackbarPos("H Lower", self.CONTROL_WINDOW, 100)
+        cv2.setTrackbarPos("H Upper", self.CONTROL_WINDOW, 130)
+        cv2.setTrackbarPos("S Lower", self.CONTROL_WINDOW, 120)
+        cv2.setTrackbarPos("V Lower", self.CONTROL_WINDOW, 100)
+
+        # 显示一个小提示，确保控制窗口能被系统正确渲染
+        control_panel = np.zeros((60, 500, 3), dtype=np.uint8)
+        cv2.putText(control_panel, "Drag sliders to tune", (10, 40),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+        cv2.imshow(self.CONTROL_WINDOW, control_panel)
 
     def nothing(self, x):
         """Trackbar回调函数，不需要额外操作"""
         pass
 
+    def _resize_for_display(self, image):
+        """
+        根据屏幕分辨率缩放显示图像，使显示窗口尽可能大且不超出屏幕
+        :param image: 原始图像
+        :return: 缩放后的图像
+        """
+        h, w = image.shape[:2]
+        max_width = getattr(self, 'display_max_w', 1600)
+        max_height = getattr(self, 'display_max_h', 900)
+        scale = min(1.0, max_width / w, max_height / h)
+        if scale >= 1.0:
+            return image
+        new_w = int(w * scale)
+        new_h = int(h * scale)
+        return cv2.resize(image, (new_w, new_h))
+
     def get_trackbar_values(self):
         """读取当前Trackbar的值"""
-        h_lower = cv2.getTrackbarPos("H Lower", self.WINDOW_NAME)
-        h_upper = cv2.getTrackbarPos("H Upper", self.WINDOW_NAME)
-        h_lower2 = cv2.getTrackbarPos("H Lower2", self.WINDOW_NAME)
-        h_upper2 = cv2.getTrackbarPos("H Upper2", self.WINDOW_NAME)
-        s_lower = cv2.getTrackbarPos("S Lower", self.WINDOW_NAME)
-        s_upper = cv2.getTrackbarPos("S Upper", self.WINDOW_NAME)
-        v_lower = cv2.getTrackbarPos("V Lower", self.WINDOW_NAME)
-        v_upper = cv2.getTrackbarPos("V Upper", self.WINDOW_NAME)
-        blur_k = cv2.getTrackbarPos("Blur Kernel", self.WINDOW_NAME)
-        morph_k = cv2.getTrackbarPos("Morph Kernel", self.WINDOW_NAME)
-        min_area = cv2.getTrackbarPos("Min Area", self.WINDOW_NAME)
+        h_lower = cv2.getTrackbarPos("H Lower", self.CONTROL_WINDOW)
+        h_upper = cv2.getTrackbarPos("H Upper", self.CONTROL_WINDOW)
+        h_lower2 = cv2.getTrackbarPos("H Lower2", self.CONTROL_WINDOW)
+        h_upper2 = cv2.getTrackbarPos("H Upper2", self.CONTROL_WINDOW)
+        s_lower = cv2.getTrackbarPos("S Lower", self.CONTROL_WINDOW)
+        s_upper = cv2.getTrackbarPos("S Upper", self.CONTROL_WINDOW)
+        v_lower = cv2.getTrackbarPos("V Lower", self.CONTROL_WINDOW)
+        v_upper = cv2.getTrackbarPos("V Upper", self.CONTROL_WINDOW)
+        blur_k = cv2.getTrackbarPos("BlurK", self.CONTROL_WINDOW)
+        morph_k = cv2.getTrackbarPos("MorphK", self.CONTROL_WINDOW)
+        min_area = cv2.getTrackbarPos("MinArea", self.CONTROL_WINDOW)
 
         # 模糊核和形态学核必须为奇数
         blur_k = max(1, blur_k)
@@ -139,14 +185,19 @@ class TrackbarTool:
         """启动调参界面主循环"""
         print("=" * 50)
         print("OpenCV HSV 交互调参工具")
-        print("窗口标题:", self.WINDOW_NAME)
+        print("控制窗口:", self.CONTROL_WINDOW)
+        print("显示窗口:", self.DISPLAY_WINDOW)
         print("按 'q' 退出")
         print("按 's' 保存当前参数和结果到 test_images/results/task4/trackbar/")
         print("=" * 50)
         while True:
             params = self.get_trackbar_values()
             combined, mask = self.process(params)
-            cv2.imshow(self.WINDOW_NAME, combined)
+            # 控制窗口和图片窗口分离，图片可以独立放大显示
+            display = self._resize_for_display(combined)
+            cv2.imshow(self.DISPLAY_WINDOW, display)
+            # 强制显示窗口尺寸与图片一致，避免WINDOW_NORMAL下图片被拉伸变形
+            cv2.resizeWindow(self.DISPLAY_WINDOW, display.shape[1], display.shape[0])
 
             key = cv2.waitKey(1) & 0xFF
             if key == ord('q'):
@@ -154,8 +205,12 @@ class TrackbarTool:
             if key == ord('s'):
                 self.save_current_state(params, combined, mask)
 
-            # 检测窗口是否被鼠标关闭，避免程序在后台空转
-            if cv2.getWindowProperty(self.WINDOW_NAME, cv2.WND_PROP_VISIBLE) < 1:
+            # 检测任一窗口被关闭时退出，避免程序在后台空转
+            try:
+                if (cv2.getWindowProperty(self.CONTROL_WINDOW, cv2.WND_PROP_VISIBLE) < 1 or
+                    cv2.getWindowProperty(self.DISPLAY_WINDOW, cv2.WND_PROP_VISIBLE) < 1):
+                    break
+            except cv2.error:
                 break
 
         cv2.destroyAllWindows()
